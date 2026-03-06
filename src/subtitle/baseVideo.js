@@ -1,0 +1,357 @@
+import { XMLHttpRequestInterceptor } from "@mswjs/interceptors/XMLHttpRequest";
+import { debounce } from "throttle-debounce";
+import memoize from "memoizee";
+import { waitUntil, WAIT_FOREVER } from "async-wait-until";
+var browser;
+try {
+  browser = require("webextension-polyfill");
+} catch (error) { }
+import TextUtil from "/src/util/text_util.js";
+
+export default class BaseVideo {
+  static sitePattern = /^(https:\/\/)(example\.com)/;
+  static captionRequestPattern = /^(https:\/\/)(example\.com)/;
+  static baseUrl = "https://example.com";
+  static playerSelector = "video";
+  static captionContainerSelector = "";
+  static captionWindowSelector = "";
+  static captionBoxSelector = "";
+  static listenButtonSelector = "";
+
+  static isPaused = false;
+  static pausedByExtension = false;
+  static isEventListenerLoaded = false;
+  static interceptorLoaded = false;
+  static scriptUrl = "subtitle.js";
+  static interceptKillTime = 1 * 60 * 1000; //1min
+  static interceptor = new XMLHttpRequestInterceptor();
+  static setting = {};
+  static useManualIntercept = false;
+  static subtitleLangDict = {};
+
+  static async handleVideo(setting) {
+    if (!this.isVideoSite() || setting["detectSubtitle"] == "null") {
+      return;
+    }
+    this.initVariable(setting);
+    await this.initInjectScript(setting);
+    await this.loadEventListener();
+    this.handleUrlChange();
+  }
+  static initVariable(setting) {
+    this.setting = setting;
+  }
+  static async loadEventListener() {
+    if (this.isEventListenerLoaded) {
+      return;
+    }
+    this.isEventListenerLoaded = true;
+    this.listenUrl();
+    this.listenPlayer();
+  }
+  static async listenPlayer() {
+    await this.waitPlayer();
+    this.listenPlay();
+    this.listenPause();
+    this.listenCaptionHover();
+    this.listenButton();
+    this.listenKey();
+  }
+  static isVideoSite(url = window.location.href) {
+    return this.sitePattern.test(url);
+  }
+  static getVideoId(url = window.location.href) {
+    throw new Error("Not implemented");
+  }
+  static guessVideoLang(videoId) {
+    throw new Error("Not implemented");
+  }
+  static guessSubtitleLang(url, subtitle) {
+    throw new Error("Not implemented");
+  }
+  static requestSubtitle(subUrl, lang, tlang, videoId) {
+    throw new Error("Not implemented");
+  }
+  static parseSubtitle(sub, lang) {
+    throw new Error("Not implemented");
+  }
+  static mergeSubtitles(sub1, sub2) {
+    throw new Error("Not implemented");
+  }
+
+  static async getPreferredSourceLang(videoId) {
+    if (this.setting["detectSubtitle"] == "targetsinglesub") {
+      return this.getTargetLangMeta();
+    }
+    return await this.guessVideoLang(videoId);
+  }
+  static async getTargetLangMeta() {
+    return this.getSettingTargetLang();
+  }
+  static getPreferredTargetLang() {
+    return this.getSettingTargetLang()
+  }
+  static getSettingTargetLang() {
+    var lang = this.setting["translateTarget"];
+    return this.subtitleLangDict[lang] || lang;
+  }
+
+  // player control by extension================================
+  static play() {
+    //play only when paused by extension
+    if (this.pausedByExtension == false) {
+      return;
+    }
+    this.pausedByExtension = false;
+    this.playPlayer();
+  }
+  static pause() {
+    //if already paused skip
+    if (
+      this.isPaused == true ||
+      this.setting["mouseoverPauseSubtitle"] == "false"
+    ) {
+      return;
+    }
+    this.pausedByExtension = true;
+    this.pausePlayer();
+  }
+  static handleUrlChange(url = window.location.href) {
+    this.pausedByExtension = false;
+  }
+
+  // player control================================
+  // html5 video control
+  static getPlayer() {
+    return document.querySelector(this.playerSelector);
+  }
+  static playPlayer() {
+    this.getPlayer()?.play();
+  }
+  static pausePlayer() {
+    this.getPlayer()?.pause();
+  }
+  static checkPlayerReady() {
+    return this.getPlayer()?.readyState >= 3;
+  }
+
+  // listen=========================================
+  static async listenCaptionHover() {
+    if (!this.captionContainerSelector) {
+      return;
+    }
+    await this.waitUntil(() => document.querySelector(this.captionContainerSelector));
+
+    //inject action for hover play stop
+    const observer = new MutationObserver((mutations) => {
+      document.querySelectorAll(this.captionBoxSelector).forEach(el => {
+        el.oncontextmenu = (e) => e.stopPropagation();
+        el.onmousedown = (e) => e.stopPropagation();
+      });
+
+      // add auto pause when mouseover
+      document.querySelectorAll(this.captionWindowSelector).forEach(el => {
+        el.onmouseenter = (e) => this.pause();
+        el.onmouseleave = (e) => this.play();
+        el.setAttribute("draggable", "false");
+      });
+    });
+
+    //check subtitle change
+    var container = document.querySelector(this.captionContainerSelector);
+    if (container) {
+      observer.observe(container, {
+        subtree: true,
+        childList: true,
+      });
+    }
+  }
+
+  static listenUrl() {
+    navigation.addEventListener("navigate", (e) => {
+      this.handleUrlChange(e.destination.url);
+    });
+  }
+  static listenPlay() {
+    this.getPlayer()?.addEventListener("play", (e) => {
+      this.isPaused = false;
+    });
+  }
+  static listenPause() {
+    this.getPlayer()?.addEventListener("pause", (e) => {
+      this.isPaused = true;
+    });
+  }
+
+  static listenButton() {
+    const btn = document.querySelector(this.listenButtonSelector);
+    if (btn) {
+      btn.addEventListener("click", (e) => {
+        this.handleButtonKey(e);
+      });
+    }
+  }
+  static listenKey() {
+    document.addEventListener("keydown", (e) => {
+      this.handleButtonKey(e);
+    });
+  }
+  static handleButtonKey(e) { }
+
+  //handle dual caption =============================
+  static async interceptCaption() {
+    if (this.interceptorLoaded) {
+      return;
+    }
+    this.interceptorLoaded = true;
+    this.interceptor.apply();
+    this.interceptor.on("request", async ({ request, requestId }) => {
+      try {
+        if (this.captionRequestPattern.test(request.url)) {
+          //get source lang sub
+          var response = await this.requestSubtitleCached(request.url);
+          var targetLang = this.getPreferredTargetLang();
+          var sourceLang = this.guessSubtitleLang(request.url);
+          var sub1 = this.parseSubtitle(response, sourceLang);
+          var responseSub = sub1;
+          //get target lang sub, if not same lang
+          if (
+            sourceLang != targetLang &&
+            this.setting["detectSubtitle"] == "dualsub"
+          ) {
+            await this.waitRandom(300, 2000); //wait for avoid ban
+            var sub2 = await this.requestSubtitleCached(
+              request.url,
+              targetLang
+            );
+            var sub2 = this.parseSubtitle(sub2, targetLang);
+            var mergedSub = this.mergeSubtitles(sub1, sub2);
+            responseSub = mergedSub;
+          }
+
+          request.respondWith(
+            new Response(JSON.stringify(responseSub), response)
+          );
+        }
+      } catch (error) {
+        console.log(error);
+      }
+    });
+  }
+  static killIntercept() {
+    this.interceptor.dispose();
+    this.interceptorLoaded = false;
+  }
+  static killInterceptDebounce = debounce(
+    this.interceptKillTime,
+    this.killIntercept
+  );
+
+  static requestSubtitleCached = memoize(async function (
+    subUrl,
+    lang,
+    tlang,
+    videoId
+  ) {
+    return await this.requestSubtitle(...arguments);
+  });
+
+  //util =======================
+  static async waitPlayer() {
+    await this.waitUntil(() => this.getPlayer());
+  }
+  static async waitPlayerReady() {
+    await this.waitUntil(() => this.checkPlayerReady());
+  }
+  static async wait(time) {
+    await new Promise((resolve) => setTimeout(resolve, time));
+  }
+  static async waitRandom(min, max) {
+    const time = Math.random() * (max - min) + min;
+    await this.wait(time);
+  }
+
+
+  static async waitUntil(fn, time) {
+    var time = time || WAIT_FOREVER;
+    await waitUntil(fn, {
+      timeout: WAIT_FOREVER,
+    });
+  }
+  static getUrlParam(url) {
+    //get paths
+    var pathJson = {};
+    var paths = new URL(url).pathname.split("/");
+    for (var [index, value] of paths.entries()) {
+      pathJson[index] = value;
+    }
+    //get params
+    let params = new URL(url).searchParams;
+    var paramsJson = Object.fromEntries(params);
+    return TextUtil.concatJson(pathJson, paramsJson);
+  }
+  static filterSpecialText(word) {
+    return word.replace(/[^a-zA-Z ]/g, "");
+  }
+
+  //inject script for handle local function===============================
+
+  static async initInjectScript(setting) {
+    if (this.checkIsInjectedScript()) {
+      return;
+    }
+    await this.injectScript();
+    this.resetInjectScript(setting);
+  }
+
+  static async resetInject(data) {
+    this.initVariable(data);
+    if (!this.useManualIntercept) {
+      this.interceptCaption();
+    }
+  }
+  static checkIsInjectedScript() {
+    return browser?.runtime?.id == null;
+  }
+
+  static injectScript(scriptUrl = this.scriptUrl) {
+    return new Promise((resolve) => {
+      var url = browser.runtime.getURL(scriptUrl);
+      var id = this.filterSpecialText(url);
+      if (!scriptUrl || document.getElementById(id)) {
+        resolve();
+        return;
+      }
+
+      var script = document.createElement("script");
+      script.id = id;
+      script.onload = () => resolve();
+      script.src = url;
+      document.head.appendChild(script);
+    });
+  }
+  //message between inject script==========================================
+  static listenMessageFrameFromInject() {
+    if (!this.isVideoSite() || !this.checkIsInjectedScript()) {
+      return;
+    }
+    window.addEventListener("message", ({ data }) => {
+      if (data?.type == "resetInjectScript") {
+        this?.resetInject(data?.setting);
+      } else if (data?.type == "callMethod") {
+        this?.[data?.name]?.(...data?.args);
+      }
+    });
+  }
+  // handle local function by injecting and call
+
+  static callMethodFromInject(name, ...args) {
+    this.sendMessageFrame({ type: "callMethod", name, args });
+  }
+  static resetInjectScript(setting) {
+    this.sendMessageFrame({ type: "resetInjectScript", setting });
+  }
+  static sendMessageFrame(message) {
+    window.postMessage(message, "*");
+  }
+}
