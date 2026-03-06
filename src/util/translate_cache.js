@@ -44,7 +44,9 @@ async function loadCache() {
 async function saveCache(cache) {
     try {
         await browser.storage.local.set({ [CACHE_KEY]: cache });
-    } catch (e) { }
+    } catch (e) {
+        console.warn("[MTT] Failed to save translation cache:", e);
+    }
 }
 
 /**
@@ -124,5 +126,7 @@ export async function setCachedTranslation(text, sourceLang, targetLang, engine,
 export async function clearTranslationCache() {
     try {
         await browser.storage.local.remove(CACHE_KEY);
-    } catch (e) { }
+    } catch (e) {
+        console.warn("[MTT] Failed to clear translation cache:", e);
+    }
 }

@@ -20,11 +20,11 @@ var mouseTarget = null;
 const nodeLengthCache = new WeakMap();
 var prevWordSegIndex = 0;
 
-export function enableMouseoverTextEvent(_window = window, currentSetting, keyDownListParam) {
+export function enableMouseoverTextEvent(_window = window, currentSetting, keyDownListParam, signal) {
   setting = currentSetting;
   keyDownList = keyDownListParam;
   var textDetectTime = setting?.["mouseoverEventInterval"] || 300;
-  
+
   _win = _window;
   textDetectTime = Number(textDetectTime);
   const triggerMouseoverTextWithDelay = debounce(async () => {
@@ -34,10 +34,10 @@ export function enableMouseoverTextEvent(_window = window, currentSetting, keyDo
   window.addEventListener("mousemove", async (e) => {
     updateMouseoverXY(e);
     triggerMouseoverTextWithDelay();
-  });
+  }, { signal });
   window.addEventListener("scroll", (e) => {
     triggerMouseoverTextWithDelay();
-  });
+  }, { signal });
 }
 
 export async function forceTriggerMouseoverText() {
@@ -129,7 +129,7 @@ export async function getMouseoverText(x, y) {
   return mouseoverText;
 }
 
-function getTextFromRange(range, mouseoverType, useSegmentation= false) {
+function getTextFromRange(range, mouseoverType, useSegmentation = false) {
   var output = { mouseoverText: "", mouseoverRange: range };
   var wordRange = expandRange(range, mouseoverType, useSegmentation);
   if (checkXYInElement(wordRange, clientX, clientY)) {
@@ -424,10 +424,10 @@ function isPointInRange(range, x, y) {
 
 function getRangeCenterXY(range) {
   if (!range || !range.getClientRects) {
-    return {x: 0, y: 0};
+    return { x: 0, y: 0 };
   }
   const rects = range.getClientRects();
-  if (rects.length === 0) return {x: 0, y: 0};
+  if (rects.length === 0) return { x: 0, y: 0 };
   const rect = rects[0];
   const centerX = rect.left + rect.width / 2;
   const centerY = rect.top + rect.height / 2;

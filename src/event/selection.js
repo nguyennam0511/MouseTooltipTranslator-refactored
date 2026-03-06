@@ -5,7 +5,8 @@ var _win;
 var prevNoneSelect = false;
 export function enableSelectionEndEvent(
   _window = window,
-  textDetectTime = 0.7
+  textDetectTime = 0.7,
+  signal
 ) {
   _win = _window;
   textDetectTime = Number(textDetectTime) * 1000;
@@ -27,7 +28,7 @@ export function enableSelectionEndEvent(
   _win.document.addEventListener(
     "selectionchange",
     triggerSelectionEndWithDelay,
-    false
+    { capture: false, signal }
   );
 
   // Trigger on mouse up immediately. Helps reduce 700 ms delay during mouse selection.
@@ -41,14 +42,14 @@ export function enableSelectionEndEvent(
 
       triggerSelectionEnd(text);
     },
-    false
+    { capture: false, signal }
   );
   _win.document.addEventListener(
     "mousedown",
     function (e) {
       prevNoneSelect = isNoneSelectElement(e.target);
     },
-    false
+    { capture: false, signal }
   );
 }
 

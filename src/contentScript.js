@@ -109,13 +109,13 @@ var listenText = "";
 
 //determineTooltipShowHide based on hover, check mouse over word on every 700ms
 function startMouseoverDetector() {
-  enableMouseoverTextEvent(window, setting, keyDownList);
+  enableMouseoverTextEvent(window, setting, keyDownList, signal);
   addEventHandler("mouseoverText", stageTooltipTextHover);
 }
 
 //determineTooltipShowHide based on selection
 function startTextSelectDetector() {
-  enableSelectionEndEvent(window, setting["tooltipEventInterval"]); //set mouse drag text selection event
+  enableSelectionEndEvent(window, setting["tooltipEventInterval"], signal); //set mouse drag text selection event
   addEventHandler("selectionEnd", stageTooltipTextSelect);
 }
 
@@ -671,7 +671,7 @@ async function interceptGoogleDocKeyEvent() {
       evt.ctrlKey = e?.ctrlKey;
       window.dispatchEvent(evt);
       document.dispatchEvent(evt);
-    });
+    }, { signal });
   });
 }
 
