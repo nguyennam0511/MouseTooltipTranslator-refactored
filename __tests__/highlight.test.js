@@ -1,4 +1,4 @@
-jest.mock("../src/util.js", () => ({
+jest.mock("../src/util/index.js", () => ({
     filterOverlappedRect: (rects) => rects,
     isEbookReader: () => false,
 }));
