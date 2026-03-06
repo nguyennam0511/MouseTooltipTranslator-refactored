@@ -14,7 +14,7 @@ var fallbackEngineCrashTimeInit = { google: 1, bing: 2, baidu: 3 };
 var fallbackEngineCrashTime = { ...fallbackEngineCrashTimeInit };
 var fallbackEngineCrashCount = {};
 var fallbackWaitTime = 1000 * 60 * 60; // 1 hour
-var fallbackEngineSwapList = ["google", "bing", "baidu"];
+var fallbackEngineSwapList = ["google", "bing", "baidu", "deepl", "papago", "yandex"];
 var fallbackMaxRetry = fallbackEngineSwapList.length;
 
 var setting = {};

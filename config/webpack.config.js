@@ -15,7 +15,7 @@ module.exports = (env, argv) => {
   return merge(
     {
       mode: argv.mode || "production",
-      entry: glob.sync("./src/**/*.js").reduce(function (obj, el) {
+      entry: glob.sync("./src/**/*.{js,ts}").reduce(function (obj, el) {
         obj[path.parse(el).name] = el;
         return obj;
       }, {}),
@@ -35,13 +35,13 @@ module.exports = (env, argv) => {
       plugins: [
         argv.mode == "development"
           ? new ExtReloader({
-              port: 9090,
-              reloadPage: true,
-              entries: {
-                contentScript: "contentScript",
-                background: "background",
-              },
-            })
+            port: 9090,
+            reloadPage: true,
+            entries: {
+              contentScript: "contentScript",
+              background: "background",
+            },
+          })
           : false,
         new DefinePlugin({
           __VUE_OPTIONS_API__: JSON.stringify(true),

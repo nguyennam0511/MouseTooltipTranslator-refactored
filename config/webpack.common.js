@@ -23,6 +23,7 @@ const common = {
     alias: {
       vue$: "vue/dist/vue.esm-bundler.js",
     },
+    extensions: [".ts", ".js", ".vue", ".json"],
   },
   module: {
     rules: [
@@ -41,6 +42,14 @@ const common = {
             },
           },
         ],
+      },
+      {
+        test: /\.ts$/,
+        loader: "ts-loader",
+        exclude: /node_modules/,
+        options: {
+          appendTsSuffixTo: [/\.vue$/],
+        }
       },
       {
         test: /\.vue$/,
