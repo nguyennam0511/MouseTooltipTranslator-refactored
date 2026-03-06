@@ -30,7 +30,7 @@ const common = {
       {
         test: /\.s(c|a)ss$/,
         use: [
-          MiniCssExtractPlugin.loader,
+          "vue-style-loader",
           "css-loader",
           {
             loader: "sass-loader",
@@ -65,12 +65,7 @@ const common = {
       {
         test: /\.css$/,
         use: [
-          {
-            loader: MiniCssExtractPlugin.loader,
-            options: {
-              publicPath: "",
-            },
-          },
+          "style-loader",
           "css-loader",
         ],
       },
@@ -96,9 +91,6 @@ const common = {
           },
         },
       ],
-    }),
-    new MiniCssExtractPlugin({
-      filename: "[name].css",
     }),
     ComponentsPlugin({}),
     AutoImportPlugin({

@@ -36,6 +36,7 @@
     "sass": "^1.32.7",
     "sass-loader": "^11.0.1",
     "size-plugin": "^1.2.0",
+    "style-loader": "^4.0.0",
     "ts-loader": "^9.5.4",
     "typescript": "^5.9.3",
     "unplugin-auto-import": "^0.17.5",
